@@ -580,3 +580,14 @@ def wrap_ipv6(ip):
     if ipaddress.ip_address(ip).version == 6:
         return "[%s]" % ip
     return ip
+
+
+def kexec_enabled(node):
+    """Helper to indicate if kexec is available for the node.
+
+    :returns: True if kexec is globally enabled or if kexec_enabled
+              has been set in the node driver_info field. Otherwise
+              the default is False.
+    """
+    return (CONF.agent.kexec_enabled
+            or node.driver_info.get('kexec_enabled', False))

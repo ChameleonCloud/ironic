@@ -574,3 +574,24 @@ class ValidateConductorGroupTestCase(base.TestCase):
                           utils.validate_conductor_group, object())
         self.assertRaises(exception.InvalidConductorGroup,
                           utils.validate_conductor_group, None)
+
+
+class MiscTestCase(base.TestCase):
+
+    def setUp(self):
+        super(MiscTestCase, self).setUp()
+
+        class MockNode(object):
+            driver_info = {}
+
+        self.node = MockNode()
+
+    def test_kexec_enabled(self):
+        self.assertFalse(utils.kexec_enabled(self.node))
+        self.config(group="agent", kexec_enabled=True)
+        self.assertTrue(utils.kexec_enabled(self.node))
+
+    def test_kexec_enabled_node(self):
+        self.assertFalse(utils.kexec_enabled(self.node))
+        self.node.driver_info = {'kexec_enabled': True}
+        self.assertTrue(utils.kexec_enabled(self.node))

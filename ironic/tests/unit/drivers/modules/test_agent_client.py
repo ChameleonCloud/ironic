@@ -502,6 +502,21 @@ class TestAgentClient(base.TestCase):
                     'agent_token': 'magical'},
             timeout=60)
 
+    def test_kexec(self):
+        self.client._command = mock.MagicMock(spec_set=[])
+        self.client.kexec(self.node, kernel_info='kernel',
+                          ramdisk_info='ramdisk', root_uuid='uuid',
+                          kernel_extra_arguments={},
+                          kexec_extra_arguments={})
+        self.client._command.assert_called_once_with(
+            node=self.node, method='standby.kexec',
+            params={'kernel_info': 'kernel',
+                    'ramdisk_info': 'ramdisk',
+                    'root_uuid': 'uuid',
+                    'kernel_extra_arguments': {},
+                    'kexec_kernel_arguments': {}},
+            wait=True)
+
 
 class TestAgentClientAttempts(base.TestCase):
     def setUp(self):

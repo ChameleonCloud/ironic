@@ -143,6 +143,11 @@ opts = [
                default=10,
                help=_('Wait time in seconds between attempts for validating '
                       'Neutron agent status.')),
+    cfg.BoolOpt('kexec_enabled',
+                default=False,
+                help=_('Boolean with the default of false the agent should '
+                       'attempt to kexec into the operating system being '
+                       'deployed.')),
 ]
 
 

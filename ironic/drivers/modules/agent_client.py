@@ -654,3 +654,28 @@ class AgentClient(object):
                 return self._command(node=node,
                                      method='rescue.finalize_rescue',
                                      params=params)
+
+    @METRICS.timer('AgentClient.kexec')
+    def kexec(self, node, kernel_info, ramdisk_info, root_uuid,
+              kernel_extra_arguments, kexec_extra_arguments):
+        """Instruct the ramdisk to kexec to a new kernel/ramdisk.
+
+        :param node: A Node object.
+        :raises: IronicException when failed to issue the request or there was
+                 a malformed response from the agent.
+        :raises: AgentAPIError when agent failed to execute specified command.
+        :returns: A dict containing command response from agent.
+                  See :func:`get_commands_status` for a command result sample.
+        """
+
+        params = {
+            'kernel_info': kernel_info,
+            'ramdisk_info': ramdisk_info,
+            'root_uuid': root_uuid,
+            'kernel_extra_arguments': kernel_extra_arguments,
+            'kexec_kernel_arguments': kexec_extra_arguments,
+        }
+        return self._command(node=node,
+                             method='standby.kexec',
+                             params=params,
+                             wait=True)

@@ -14,6 +14,7 @@
 #    under the License.
 
 
+import copy
 import os
 import re
 import time
@@ -966,38 +967,11 @@ def destroy_http_instance_images(node):
     destroy_images(node.uuid)
 
 
-@METRICS.timer('build_instance_info_for_deploy')
-def build_instance_info_for_deploy(task):
-    """Build instance_info necessary for deploying to a node.
-
-    :param task: a TaskManager object containing the node
-    :returns: a dictionary containing the properties to be updated
-        in instance_info
-    :raises: exception.ImageRefValidationFailed if image_source is not
-        Glance href and is not HTTP(S) URL.
-    """
-    def validate_image_url(url, secret=False):
-        """Validates image URL through the HEAD request.
-
-        :param url: URL to be validated
-        :param secret: if URL is secret (e.g. swift temp url),
-            it will not be shown in logs.
-        """
-        try:
-            image_service.HttpImageService().validate_href(url, secret)
-        except exception.ImageRefValidationFailed as e:
-            with excutils.save_and_reraise_exception():
-                LOG.error("Agent deploy supports only HTTP(S) URLs as "
-                          "instance_info['image_source'] or swift "
-                          "temporary URL. Either the specified URL is not "
-                          "a valid HTTP(S) URL or is not reachable "
-                          "for node %(node)s. Error: %(msg)s",
-                          {'node': node.uuid, 'msg': e})
+def prepare_download(task, instance_info,
+                     image_source, image_type='image'):
     node = task.node
-    instance_info = node.instance_info
-    iwdi = node.driver_internal_info.get('is_whole_disk_image')
-    image_source = instance_info['image_source']
-
+    i_info = copy.copy(instance_info)
+    i_type = image_type
     if service_utils.is_glance_image(image_source):
         glance = image_service.GlanceImageService(context=task.context)
         image_info = glance.show(image_source)
@@ -1005,15 +979,22 @@ def build_instance_info_for_deploy(task):
                   {'info': image_info, 'node': node.uuid})
         if CONF.agent.image_download_source == 'swift':
             swift_temp_url = glance.swift_temp_url(image_info)
-            validate_image_url(swift_temp_url, secret=True)
-            instance_info['image_url'] = swift_temp_url
-            instance_info['image_checksum'] = image_info['checksum']
-            instance_info['image_disk_format'] = image_info['disk_format']
-            instance_info['image_os_hash_algo'] = image_info['os_hash_algo']
-            instance_info['image_os_hash_value'] = image_info['os_hash_value']
+            validate_image_url(node, swift_temp_url, secret=True)
+            i_info['%s_url' % i_type] = swift_temp_url
+            i_info['%s_checksum' % i_type] = image_info['checksum']
+            if image_type == 'image':
+                i_info['image_disk_format'] = \
+                    image_info['disk_format']
+            i_info['%s_os_hash_algo' % i_type] = \
+                image_info['os_hash_algo']
+            i_info['%s_os_hash_value' % i_type] = \
+                image_info['os_hash_value']
         else:
             # Ironic cache and serve images from httpboot server
             force_raw = direct_deploy_should_convert_raw_image(node)
+            # TODO(TheJulia) we actually need to support getting more than
+            # just the image. Any asset preferably :\
+            # so maybe specifying type? or????
             _, image_path = cache_instance_image(task.context, node,
                                                  force_raw=force_raw)
             if force_raw:
@@ -1032,17 +1013,20 @@ def build_instance_info_for_deploy(task):
                           'image conversion.', {'image': image_path})
                 instance_info['image_checksum'] = None
                 hash_value = compute_image_checksum(image_path, os_hash_algo)
-                instance_info['image_os_hash_algo'] = os_hash_algo
-                instance_info['image_os_hash_value'] = hash_value
+                instance_info['%s_os_hash_algo' % i_type] = os_hash_algo
+                instance_info['%s_os_hash_value' % i_type] = hash_value
             else:
-                instance_info['image_checksum'] = image_info['checksum']
-                instance_info['image_disk_format'] = image_info['disk_format']
-                instance_info['image_os_hash_algo'] = image_info[
+                i_info['%s_checksum' % i_type] = image_info['checksum']
+                i_info['%s_disk_format' % i_type] = \
+                    image_info['disk_format']
+                i_info['%s_os_hash_algo' % i_type] = image_info[
                     'os_hash_algo']
-                instance_info['image_os_hash_value'] = image_info[
+                i_info['%s_os_hash_value' % i_type] = image_info[
                     'os_hash_value']
 
             # Create symlink and update image url
+
+            # Wut? This confuses TheJulia
             symlink_dir = _get_http_image_symlink_dir_path()
             fileutils.ensure_tree(symlink_dir)
             symlink_path = _get_http_image_symlink_file_path(node.uuid)
@@ -1050,23 +1034,95 @@ def build_instance_info_for_deploy(task):
             base_url = CONF.deploy.http_url
             if base_url.endswith('/'):
                 base_url = base_url[:-1]
+            # TODO(TheJulia) this doesn't seem to work for anything beyond
+            # the disk image its self...
             http_image_url = '/'.join(
                 [base_url, CONF.deploy.http_image_subdir,
                  node.uuid])
-            validate_image_url(http_image_url, secret=True)
-            instance_info['image_url'] = http_image_url
+            validate_image_url(node, http_image_url, secret=True)
+            i_info['%s_url' % i_type] = http_image_url
+            # NOTE(TheJulia): End of image_download_source =! swift
 
-        instance_info['image_container_format'] = (
-            image_info['container_format'])
-        instance_info['image_tags'] = image_info.get('tags', [])
-        instance_info['image_properties'] = image_info['properties']
+        if image_type == 'image':
+            i_info['image_container_format'] = (
+                image_info['container_format'])
+            i_info['image_tags'] = image_info.get('tags', [])
+            i_info['image_properties'] = image_info['properties']
 
-        if not iwdi:
-            instance_info['kernel'] = image_info['properties']['kernel_id']
-            instance_info['ramdisk'] = image_info['properties']['ramdisk_id']
+        if image_type == 'image':
+            kernel_id = image_info['properties'].get('kernel_id')
+            if kernel_id and not i_info.get('kernel_url'):
+                i_info['kernel'] = kernel_id
+            ramdisk_id = image_info['properties'].get('ramdisk_id')
+            if ramdisk_id and not i_info.get('ramdisk_url'):
+                i_info['ramdisk'] = ramdisk_id
     else:
-        validate_image_url(image_source)
-        instance_info['image_url'] = image_source
+        validate_image_url(node, image_source)
+        i_info['%s_url' % i_type] = image_source
+    return i_info
+
+
+def validate_image_url(node, url, secret=False):
+    """Validates image URL through the HEAD request.
+
+    :param url: URL to be validated
+    :param secret: if URL is secret (e.g. swift temp url),
+        it will not be shown in logs.
+    """
+    try:
+        image_service.HttpImageService().validate_href(url, secret)
+    except exception.ImageRefValidationFailed as e:
+        with excutils.save_and_reraise_exception():
+            LOG.error("Agent deploy supports only HTTP(S) URLs as "
+                      "instance_info['image_source'] or swift "
+                      "temporary URL. Either the specified URL is not "
+                      "a valid HTTP(S) URL or is not reachable "
+                      "for node %(node)s. Error: %(msg)s",
+                      {'node': node.uuid, 'msg': e})
+
+
+@METRICS.timer('build_instance_info_for_deploy')
+def build_instance_info_for_deploy(task):
+    """Build instance_info necessary for deploying to a node.
+
+    :param task: a TaskManager object containing the node
+    :returns: a dictionary containing the properties to be updated
+        in instance_info
+    :raises: exception.ImageRefValidationFailed if image_source is not
+        Glance href and is not HTTP(S) URL.
+    """
+
+    node = task.node
+    instance_info = node.instance_info
+    iwdi = node.driver_internal_info.get('is_whole_disk_image')
+    image_source = instance_info['image_source']
+    instance_info.update(prepare_download(task, instance_info, image_source))
+
+    if utils.kexec_enabled(node) and not iwdi:
+        # Kexec-ing to a partition image
+        kernel_id = instance_info.get('kernel') \
+            or instance_info.get('kernel_source')
+        if kernel_id and not instance_info.get('kernel_url'):
+            kernel_id = instance_info.get('kernel')
+            instance_info.update(prepare_download(task, instance_info,
+                                                  kernel_id,
+                                                  image_type='kernel'))
+
+        ramdisk_id = instance_info.get('ramdisk') or \
+            instance_info.get('ramdisk_source')
+        if ramdisk_id and not instance_info.get('ramdisk_url'):
+            instance_info.update(prepare_download(task, instance_info,
+                                                  ramdisk_id,
+                                                  image_type='ramdisk'))
+    # Additional kexec paths beyond running IPA -> Partition Image
+    # for which the instance_info is updated above.
+    # Ramdisk - IPA -> iPXE (or grub... maybe?) -> Ramdisk
+    #           using the ?multiboot-x86? format?
+    # Whole Disk - IPA -> iPXE -> IPA -> Deploy() -> mount /boot and
+    #              /boot/efi -> try read ?grub? config
+    #                  -> If reads grub config, kexec to kernel/ramdisk
+    #                     defined by grub config
+    #                  -> if Not read, kexec to the bootloader?
 
     if not iwdi:
         instance_info['image_type'] = 'partition'

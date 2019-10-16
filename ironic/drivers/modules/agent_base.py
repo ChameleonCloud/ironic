@@ -1178,8 +1178,17 @@ class AgentDeployMixin(HeartbeatMixin, AgentOobStepsMixin):
         can_power_on = (states.POWER_ON in
                         task.driver.power.get_supported_power_states(task))
 
+        kexec_enabled = utils.kexec_enabled(node)
+        kexec_reboot_triggered = strutils.bool_from_string(
+            node.driver_internal_info.get('kexec_reboot_triggered', False))
+
         try:
-            if not can_power_on:
+            if (kexec_enabled
+                    and not kexec_reboot_triggered
+                    and self.kexec_agent_to_instance(task)):
+                LOG.info('Kexec method executed on ramdisk for node %(node)s.',
+                         {'node': node.uuid})
+            elif not can_power_on:
                 LOG.info('Power interface of node %(node)s does not support '
                          'power on, using reboot to switch to the instance',
                          node.uuid)
@@ -1391,3 +1400,95 @@ class AgentDeployMixin(HeartbeatMixin, AgentOobStepsMixin):
             log_and_raise_deployment_error(task, msg, exc=e)
 
         LOG.info('Local boot successfully configured for node %s', node.uuid)
+
+    def _get_instance_image_info(node, image_type):
+        urls = node.instance_info.get('%s_url' % image_type, None)
+        if not urls:
+            raise exception.InstanceDeployFailure('kexec parameters '
+                                                  'not found.')
+        image_source = node.instance_info.get('image_source')
+        image_info = {
+            'id': image_source.split('/')[-1],
+            'urls': [node.instance_info['%s_url' % image_type]],
+            'checksum': node.instance_info['%s_checksum' % image_type],
+            # NOTE(comstud): Older versions of ironic do not set
+            # 'disk_format' nor 'container_format', so we use .get()
+            # to maintain backwards compatibility in case code was
+            # upgraded in the middle of a build request.
+            'image_type': image_type,
+            'stream_raw_images': CONF.agent.stream_raw_images,
+        }
+        # This duplicates existing proxy code. IF we add a ramdisk kexec
+        # to ramdisk, we need to go ahead and make this a helper method.
+        proxies = {}
+        for scheme in ('http', 'https'):
+            proxy_param = 'image_%s_proxy' % scheme
+            proxy = node.driver_info.get(proxy_param)
+            if proxy:
+                proxies[scheme] = proxy
+        if proxies:
+            image_info['proxies'] = proxies
+            no_proxy = node.driver_info.get('image_no_proxy')
+            if no_proxy is not None:
+                image_info['no_proxy'] = no_proxy
+
+        return image_info
+
+    @METRICS.timer('AgentDeployMixin.kexec_agent')
+    def kexec_agent_to_instance(self, task):
+        """Kexec an agent to an instance."""
+        retval = False
+        node = task.node
+        d_internal_info = node.driver_internal_info
+        driver_info = node.driver_internal_info
+        root_uuid = d_internal_info.get('root_uuid_or_disk_id', None)
+        kernel_extra_arguments = driver_info.get(
+            'kexec_kernel_extra_arguments')
+        kexec_extra_arguments = driver_info.get('kexec_extra_arguments')
+
+        try:
+            kernel_image_info = self._get_instance_image_info(node, 'kernel')
+            ramdisk_image_info = self._get_instance_image_info(node, 'ramdisk')
+        except exception.InstanceDeployFailure:
+            msg = (_('Unable to kexec. No kernel or ramdisk elements '
+                     'found in the instance_info for node %(node)s.') %
+                   {'node': node.uuid})
+            # Set last_error so there is at least some api consumer visibility
+            # that things didn't kexec which means the long reboot path is bein
+            # taken.
+            node.last_error = msg
+            LOG.error(msg)
+            return False
+
+        # Set a one time flag for kexec to have been marked
+        # as executed, so if it fails and the agent is still
+        # running, then hopefully be rebooted via normal means.
+        try:
+            result = self._client.kexec(
+                node=node,
+                kernel_image=kernel_image_info,
+                ramdisk_image=ramdisk_image_info,
+                root_uuid=root_uuid,
+                kernel_extra_arguments=kernel_extra_arguments,
+                kexec_extra_arguments=kexec_extra_arguments)
+        except Exception as e:
+            msg = _('Attempt to kexec node %(node)s has failed. '
+                    'Error: %(err)s') % {'node': node.uuid,
+                                         'err': e}
+            node.last_error = msg
+            LOG.error(msg)
+            node.save()
+
+        if result.get('command_status') == 'SUCCEEDED':
+            # Set a one time flag for kexec to have been marked
+            # as executed, so if it fails and the agent is still
+            # running, then hopefully be rebooted via normal means.
+
+            d_internal_info['kexec_reboot_triggered'] = True
+            node.driver_internal_info = d_internal_info
+            node.save()
+            retval = True
+
+        # under normal circumstances, this should be false
+        # unless we succeeded at executing the kexec command.
+        return retval
