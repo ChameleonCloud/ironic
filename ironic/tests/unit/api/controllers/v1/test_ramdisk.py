@@ -187,12 +187,41 @@ class TestLookup(test_api_base.BaseApiTest):
         for provision_state in [states.ENROLL, states.MANAGEABLE,
                                 states.AVAILABLE]:
             self.node.provision_state = provision_state
+            self.node.save()
             data = self.get_json(
                 '/lookup?addresses=%s&node_uuid=%s' %
                 (','.join(self.addresses), self.node.uuid),
                 headers={api_base.Version.string: str(api_v1.max_version())})
             self.assertEqual(self.node.uuid, data['node']['uuid'])
 
+    def test_active_lookup(self):
+        self._set_secret_mock(self.node, 'abcxyz1')
+        CONF.set_override('fast_track', True, 'deploy')
+        CONF.set_override('active_node_management', True, 'deploy')
+        for provision_state in [states.ENROLL, states.MANAGEABLE,
+                                states.AVAILABLE, states.ACTIVE]:
+            self.node.provision_state = provision_state
+            self.node.save()
+            data = self.get_json(
+                '/lookup?addresses=%s&node_uuid=%s' %
+                (','.join(self.addresses), self.node.uuid),
+                headers={api_base.Version.string: str(api_v1.max_version())})
+            self.assertEqual(self.node.uuid, data['node']['uuid'])
+            self.assertEqual('abcxyz1', data.get('config').get('agent_token'))
+
+    def test_active_lookup_not_permitted(self):
+        self._set_secret_mock(self.node, 'abcxyz1')
+        CONF.set_override('restrict_lookup', True, 'api')
+        CONF.set_override('fast_track', True, 'deploy')
+        CONF.set_override('active_node_management', False, 'deploy')
+        self.node.provision_state = states.ACTIVE
+        self.node.save()
+        response = self.get_json(
+            '/lookup?addresses=%s&node_uuid=%s' %
+            (','.join(self.addresses), self.node.uuid),
+            headers={api_base.Version.string: str(api_v1.max_version())},
+            expect_errors=True)
+        self.assertEqual(http_client.NOT_FOUND, response.status_int)
 
 @mock.patch.object(rpcapi.ConductorAPI, 'get_topic_for',
                    lambda *n: 'test-topic')

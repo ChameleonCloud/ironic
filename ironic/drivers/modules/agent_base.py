@@ -76,7 +76,8 @@ VENDOR_PROPERTIES = {
 }
 
 __HEARTBEAT_RECORD_ONLY = (states.ENROLL, states.MANAGEABLE, states.AVAILABLE,
-                           states.CLEANING, states.DEPLOYING, states.RESCUING)
+                           states.CLEANING, states.DEPLOYING, states.RESCUING,
+                           states.ACTIVE)
 _HEARTBEAT_RECORD_ONLY = frozenset(__HEARTBEAT_RECORD_ONLY)
 
 _HEARTBEAT_ALLOWED = (states.DEPLOYWAIT, states.CLEANWAIT, states.RESCUEWAIT,
@@ -90,6 +91,13 @@ _FASTTRACK_HEARTBEAT_ALLOWED = (states.DEPLOYWAIT, states.CLEANWAIT,
                                 states.MANAGEABLE, states.AVAILABLE,
                                 states.DEPLOYING)
 FASTTRACK_HEARTBEAT_ALLOWED = frozenset(_FASTTRACK_HEARTBEAT_ALLOWED)
+
+_ACTIVE_MGMT_HEARTBEAT = (states.DEPLOYWAIT, states.CLEANWAIT,
+                          states.RESCUEWAIT, states.ENROLL,
+                          states.MANAGEABLE, states.AVAILABLE,
+                          states.DEPLOYING, states.ACTIVE)
+
+ACTIVE_MGMT_HEARTBEAT_ALLOWED = frozenset(_ACTIVE_MGMT_HEARTBEAT)
 
 
 def _get_client():
@@ -481,7 +489,10 @@ class HeartbeatMixin(object):
     def heartbeat_allowed_states(self):
         """Define node states where heartbeating is allowed"""
         if CONF.deploy.fast_track:
+            if CONF.deploy.active_node_management:
+                return ACTIVE_MGMT_HEARTBEAT_ALLOWED
             return FASTTRACK_HEARTBEAT_ALLOWED
+
         return HEARTBEAT_ALLOWED
 
     def _heartbeat_in_maintenance(self, task):

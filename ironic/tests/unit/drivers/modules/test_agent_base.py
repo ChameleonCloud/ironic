@@ -409,6 +409,39 @@ class HeartbeatMixinTest(AgentDeployMixinBaseTest):
             self.assertEqual(0, rti_mock.call_count)
             self.assertEqual(0, cd_mock.call_count)
 
+    @mock.patch.object(agent_base.HeartbeatMixin, 'continue_deploy',
+                       autospec=True)
+    @mock.patch.object(agent_base.HeartbeatMixin,
+                       'reboot_to_instance', autospec=True)
+    @mock.patch.object(manager_utils, 'notify_conductor_resume_operation',
+                       autospec=True)
+    def test_heartbeat_in_active_state(self, ncrc_mock, rti_mock,
+                                       cd_mock):
+        CONF.set_override('fast_track', True, group='deploy')
+        CONF.set_override('active_node_management', True, group='deploy')
+        CONF.set_override('allow_provisioning_in_maintenance', False,
+                          group='conductor')
+        self.node.provision_state = states.ACTIVE
+        self.node.maintenance = False
+        self.node.save()
+        agent_url = 'url-magic'
+        with task_manager.acquire(self.context, self.node.uuid,
+                                  shared=True) as task:
+            self.deploy.heartbeat(task, agent_url, '3.2.0')
+            self.assertFalse(task.shared)
+            self.assertEqual(
+                agent_url,
+                task.node.driver_internal_info.get('agent_url', None))
+            self.assertEqual(
+                '3.2.0',
+                task.node.driver_internal_info['agent_version'])
+        self.node.refresh()
+        self.assertEqual(states.ACTIVE, self.node.provision_state)
+        self.assertIsNone(self.node.last_error)
+        self.assertEqual(0, ncrc_mock.call_count)
+        self.assertEqual(0, rti_mock.call_count)
+        self.assertEqual(0, cd_mock.call_count)
+
     @mock.patch('time.sleep', lambda _t: None)
     @mock.patch.object(agent_base.HeartbeatMixin, 'continue_deploy',
                        autospec=True)

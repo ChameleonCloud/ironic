@@ -87,6 +87,8 @@ class LookupController(rest.RestController):
     @property
     def lookup_allowed_states(self):
         if CONF.deploy.fast_track:
+            if CONF.deploy.active_node_management:
+                return states.ACTIVE_LOOKUP_ALLOWED_STATES
             return states.FASTTRACK_LOOKUP_ALLOWED_STATES
         return states.LOOKUP_ALLOWED_STATES
 
@@ -149,7 +151,9 @@ class LookupController(rest.RestController):
             # we don't disclose the difference between nodes that are not found
             # at all and nodes in a wrong state by different error messages.
             raise exception.NotFound()
-
+        print(CONF.api.restrict_lookup)
+        print(self.lookup_allowed_states)
+        print(node.provision_state)
         if (CONF.api.restrict_lookup
                 and node.provision_state not in self.lookup_allowed_states):
             raise exception.NotFound()

@@ -158,6 +158,13 @@ opts = [
                        'cleaning operations to fail due to the possible '
                        'operational security risk of data being retained '
                        'between deployments of the bare metal node.')),
+    cfg.BoolOpt('active_node_management',
+                default=False,
+                help=_('If heartbeats fron the ironic-python-agent should '
+                       'be recorded for the purposes of managing the active '
+                       'node. This feature requires [deploy]fast_track to be '
+                       'enabled, as these support cases do not power-off '
+                       'the node for provisioning operations.')),
 ]
 
 

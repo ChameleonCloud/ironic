@@ -257,6 +257,15 @@ _FASTTRACK_LOOKUP_ALLOWED_STATES = (ENROLL, MANAGEABLE, AVAILABLE,
 FASTTRACK_LOOKUP_ALLOWED_STATES = frozenset(_FASTTRACK_LOOKUP_ALLOWED_STATES)
 """States where API lookups are permitted with fast track enabled."""
 
+_ACTIVE_MGMT_LOOKUP_ALLOWED_STATES = (ENROLL, MANAGEABLE, AVAILABLE,
+                                      DEPLOYING, DEPLOYWAIT,
+                                      CLEANING, CLEANWAIT,
+                                      INSPECTING, INSPECTWAIT,
+                                      RESCUING, RESCUEWAIT, ACTIVE)
+ACTIVE_LOOKUP_ALLOWED_STATES = frozenset(_ACTIVE_MGMT_LOOKUP_ALLOWED_STATES)
+"""States where API lookups are permitted with fast track enabled."""
+
+
 
 ##############
 # Power states

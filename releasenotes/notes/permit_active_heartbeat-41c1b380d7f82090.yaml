@@ -1,0 +1,7 @@
+---
+features:
+  - |
+    Adds functionality to permit lookup and heartbeat operations for
+    nodes in an ``active`` provision state. This feature can be enabled
+    with the ``[deploy]active_node_management``. This feature requires
+    ``[deploy]fast_track`` to be set to ``True``.
