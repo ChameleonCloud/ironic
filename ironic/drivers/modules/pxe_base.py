@@ -226,6 +226,7 @@ class PXEBaseMixin(object):
                   'with kernel params %(params)s',
                   {'node': node.uuid, 'params': pxe_options})
 
+
     @METRICS.timer('PXEBaseMixin.prepare_instance')
     def prepare_instance(self, task):
         """Prepares the boot of instance.

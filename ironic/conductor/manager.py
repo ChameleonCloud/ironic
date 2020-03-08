@@ -1007,9 +1007,9 @@ class ConductorManager(base_manager.BaseConductorManager):
                 else:
                     notify_utils.emit_console_notification(
                         task, 'console_stop', fields.NotificationStatus.END)
-
-            task.driver.deploy.clean_up(task)
-            task.driver.deploy.tear_down(task)
+            if not is_fast_track_to_cleaning(task):
+                task.driver.deploy.clean_up(task)
+                task.driver.deploy.tear_down(task)
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 LOG.exception('Error in tear_down of node %(node)s: %(err)s',
@@ -1036,7 +1036,8 @@ class ConductorManager(base_manager.BaseConductorManager):
             driver_internal_info.pop('is_whole_disk_image', None)
             driver_internal_info.pop('deploy_boot_mode', None)
             node.driver_internal_info = driver_internal_info
-            network.remove_vifs_from_node(task)
+            if not utils.is_fast_track_to_cleaning(task):
+                network.remove_vifs_from_node(task)
             node.save()
             if node.allocation_id:
                 allocation = objects.Allocation.get_by_id(task.context,

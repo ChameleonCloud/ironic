@@ -489,6 +489,8 @@ class AgentDeploy(AgentDeployMixin, agent_base.AgentBaseMixin,
             # immediately to the next deploy step.
             LOG.debug('Performing a fast track deployment for %(node)s.',
                       {'node': task.node.uuid})
+            # <---- Should we kexec here, or create a separate step?
+            # The conundrum is below, where we reboot into to reach the agent.
         elif task.driver.storage.should_write_image(task):
             # Check if the driver has already performed a reboot in a previous
             # deploy step.

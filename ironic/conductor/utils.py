@@ -34,6 +34,7 @@ from ironic.common.i18n import _
 from ironic.common import network
 from ironic.common import nova
 from ironic.common import states
+from ironic.common import utils
 from ironic.conductor import notification_utils as notify_utils
 from ironic.conductor import task_manager
 from ironic.objects import fields
@@ -1012,6 +1013,14 @@ def is_fast_track(task):
                        'agent_last_heartbeat')})
         return False
 
+
+def is_fast_track_to_cleaning(task):
+    # NOTE(TheJulia): Active node management may be the big scary knob
+    # required... seems redundant to have two controls.
+    return (is_fast_track(task)
+            and CONF.deploy.active_node_management
+            and utils.kexec_enabled(task.node)
+            and CONF.conductor.automated_clean)
 
 def remove_agent_url(node):
     """Helper to remove the agent_url record."""
