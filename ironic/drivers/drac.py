@@ -24,6 +24,7 @@ from ironic.drivers.modules.drac import power
 from ironic.drivers.modules.drac import raid
 from ironic.drivers.modules.drac import vendor_passthru
 from ironic.drivers.modules import inspector
+from ironic.drivers.modules import ipmitool
 from ironic.drivers.modules import noop
 
 
@@ -47,6 +48,12 @@ class IDRACHardware(generic.GenericHardware):
         return [power.DracWSManPower, power.DracPower, power.DracRedfishPower]
 
     # Optional hardware interfaces
+
+    @property
+    def supported_console_interfaces(self):
+        """List of supported console interfaces."""
+        return [ipmitool.IPMISocatConsole, ipmitool.IPMIShellinaboxConsole,
+                noop.NoConsole]
 
     @property
     def supported_inspect_interfaces(self):
