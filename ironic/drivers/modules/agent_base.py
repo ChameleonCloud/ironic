@@ -1081,7 +1081,16 @@ class AgentDeployMixin(HeartbeatMixin, AgentOobStepsMixin):
         :returns: A list of deploy step dictionaries
         """
         steps = super(AgentDeployMixin, self).get_deploy_steps(task)[:]
-        ib_steps = get_steps(task, 'deploy', interface='deploy')
+
+        # NOTE(shermanm): allow default config steps to be modified via config file
+        # see https://docs.openstack.org/ironic/latest/admin/node-deployment.html
+        new_priorities = {}
+        if CONF.deploy.erase_devices_metadata_during_deploy:
+            # priorities 81-99 will happen after agent is booted, but before disk image is written
+            # deploy.write_image has default priority of 80
+            new_priorities['erase_devices_metadata'] = 85
+
+        ib_steps = get_steps(task, 'deploy', interface='deploy', override_priorities=new_priorities)
         # NOTE(dtantsur): we allow in-band steps to be shadowed by out-of-band
         # ones, see the docstring of execute_deploy_step for details.
         steps += [step for step in ib_steps

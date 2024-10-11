@@ -66,6 +66,13 @@ opts = [
                       'ramdisk (defaults to 99 for the '
                       'GenericHardwareManager). If set to 0, will not run '
                       'during cleaning.')),
+    cfg.BoolOpt('erase_devices_metadata_during_deploy',
+               default=False,
+               mutable=True,
+               help=_('Whether to wipe metadata from all disks during '
+                      'the deploy process, prior to writing the image. '
+                      'primarily used to address issues when automatic '
+                      'cleaning is disabled. Defaults to False.')),
     cfg.IntOpt('delete_configuration_priority',
                mutable=True,
                help=_('Priority to run in-band clean step that erases '
