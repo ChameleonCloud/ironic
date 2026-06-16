@@ -2649,7 +2649,7 @@ class IPMIToolDriverTestCase(Base):
         mock_calls = [
             mock.call(self.info, "raw 0x00 0x08 0x03 0x08"),
             mock.call(self.info, "raw 0x00 0x08 0x05 0xe0 "
-                                 "0x24 0x00 0x00 0x00")
+                                 "0x08 0x00 0x00 0x00")
         ]
         mock_exec.assert_has_calls(mock_calls)
 
@@ -2670,7 +2670,7 @@ class IPMIToolDriverTestCase(Base):
         mock_calls = [
             mock.call(self.info, "raw 0x00 0x08 0x03 0x08"),
             mock.call(self.info, "raw 0x00 0x08 0x05 0xa0 "
-                                 "0x24 0x00 0x00 0x00")
+                                 "0x08 0x00 0x00 0x00")
         ]
         mock_exec.assert_has_calls(mock_calls)
 
