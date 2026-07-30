@@ -23,7 +23,6 @@ import errno
 import fcntl
 import ipaddress
 import os
-import shlex
 import signal
 import socket
 import subprocess
@@ -425,8 +424,7 @@ def start_socat_console(node_uuid, port, console_cmd):
     args.append(arg % {'host': console_host,
                        'port': port})
 
-    quoted_cmd = shlex.quote(console_cmd)
-    args.append('EXEC:"%s",pty,stderr' % quoted_cmd)
+    args.append('EXEC:"%s",pty,stderr' % console_cmd)
 
     # run the command as a subprocess
     try:
