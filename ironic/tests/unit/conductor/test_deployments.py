@@ -418,9 +418,7 @@ class DoNodeDeployTestCase(mgr_utils.ServiceSetUpMixin, db_base.DbTestCase):
                            mock_power_validate, mock_process_event,
                            automatic_lessee=None, iinfo=None,
                            automatic_lessee_source=None):
-        self.context.auth_token_info = {
-            'token': {'project': {'id': 'user-project'}}
-        }
+        self.context.project_id = 'user-project'
         if iinfo is None:
             iinfo = {}
 
@@ -476,6 +474,12 @@ class DoNodeDeployTestCase(mgr_utils.ServiceSetUpMixin, db_base.DbTestCase):
         """Validates that project_id from request context is the lessee."""
         self._test_start_deploy(automatic_lessee_source=lessee_sources.REQUEST)
 
+    def test_start_deploy_lessee_source_request_with_service_token(self):
+        """The user's project is the lessee, not the service's."""
+        self.context.service_user_id = 'service-user'
+        self.context.service_project_id = 'service-project'
+        self._test_start_deploy(automatic_lessee_source=lessee_sources.REQUEST)
+
     def test_start_deploy_lessee_source_instance(self):
         """Validates that project_id from instance info is the lessee."""
         self._test_start_deploy(
@@ -498,9 +502,7 @@ class DoNodeDeployTestCase(mgr_utils.ServiceSetUpMixin, db_base.DbTestCase):
             self, mock_iwdi, mock_validate_traits,
             mock_validate_deploy_user_steps_and_templates,
             mock_deploy_validate, mock_power_validate, mock_process_event):
-        self.context.auth_token_info = {
-            'token': {'project': {'id': 'user-project'}}
-        }
+        self.context.project_id = 'user-project'
         iinfo = {'project_id': 'user-project-iinfo'}
 
         # Legacy lessee is disabled
@@ -1250,6 +1252,42 @@ class DoNextDeployStepTestCase(mgr_utils.ServiceSetUpMixin,
             self.assertIn('boom', task.node.last_error)
             self.assertEqual(tgt_prv_state, node.target_provision_state)
             self.assertFalse(mock_next_step.called)
+
+
+class ApplyAutomaticLesseeTestCase(db_base.DbTestCase):
+
+    def _apply(self, lessee):
+        self.config(automatic_lessee_source=lessee_sources.INSTANCE,
+                    group='conductor')
+        node = obj_utils.create_test_node(
+            self.context, driver='fake-hardware', lessee=lessee,
+            instance_info={'project_id': 'user-project'})
+        with task_manager.acquire(self.context, node.uuid) as task:
+            with mock.patch.object(deployments.LOG, 'warning',
+                                   autospec=True) as mock_warning:
+                applied = deployments.apply_automatic_lessee(task)
+            return applied, task.node, mock_warning
+
+    def test_unleased_node(self):
+        applied, node, mock_warning = self._apply(None)
+        self.assertTrue(applied)
+        self.assertEqual('user-project', node.lessee)
+        self.assertTrue(node.driver_internal_info['automatic_lessee'])
+        mock_warning.assert_not_called()
+
+    def test_already_leased_to_project(self):
+        applied, node, mock_warning = self._apply('user-project')
+        self.assertFalse(applied)
+        self.assertEqual('user-project', node.lessee)
+        self.assertNotIn('automatic_lessee', node.driver_internal_info)
+        mock_warning.assert_not_called()
+
+    def test_leased_to_another_project(self):
+        applied, node, mock_warning = self._apply('other-project')
+        self.assertFalse(applied)
+        self.assertEqual('other-project', node.lessee)
+        self.assertNotIn('automatic_lessee', node.driver_internal_info)
+        self.assertTrue(mock_warning.called)
 
 
 @mock.patch.object(swift, 'SwiftAPI', autospec=True)

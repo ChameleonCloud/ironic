@@ -491,8 +491,7 @@ class TestCommonFunctions(db_base.DbTestCase):
         self.port.save()
         with task_manager.acquire(self.context, self.node.id) as task:
             common.plug_port_to_tenant_network(task, self.port)
-            wait_agent_mock.assert_called_once_with(
-                nclient, 'hostname')
+            wait_agent_mock.assert_called_once_with(task.context, 'hostname')
             wait_port_mock.assert_called_once_with(
                 nclient, self.vif_id, 'ACTIVE', fail_on_binding_failure=True)
             self.assertTrue(mock_update.called)

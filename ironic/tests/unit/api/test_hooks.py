@@ -208,13 +208,11 @@ class TestContextHook(base.BaseApiTest):
     @mock.patch.object(policy, 'check', autospec=True)
     def _test_context_hook(self, mock_policy, mock_ctx, is_admin=False,
                            is_public_api=False, auth_strategy='keystone',
-                           request_id=None, auth_token_info=None):
+                           request_id=None):
         cfg.CONF.set_override('auth_strategy', auth_strategy)
         headers = fake_headers(admin=is_admin)
         environ = headers_to_environ(
-            headers,
-            **{'is_public_api': is_public_api,
-               'keystone.token_info': auth_token_info})
+            headers, **{'is_public_api': is_public_api})
         reqstate = FakeRequestState(headers=headers, environ=environ)
         context_hook = hooks.ContextHook(None)
         ctx = mock.Mock()
@@ -225,8 +223,7 @@ class TestContextHook(base.BaseApiTest):
         ctx.to_policy_values.return_value = policy_dict
         mock_policy.return_value = False
         context_hook.before(reqstate)
-        if auth_token_info:
-            mock_ctx.from_environ.assert_called_once_with(environ)
+        mock_ctx.from_environ.assert_called_once_with(environ)
         mock_policy.assert_not_called()
         if auth_strategy == 'noauth':
             self.assertIsNone(ctx.auth_token)
@@ -241,9 +238,6 @@ class TestContextHook(base.BaseApiTest):
 
     def test_context_hook_noauth_token_removed(self):
         self._test_context_hook(auth_strategy='noauth')
-
-    def test_context_hook_auth_token_info(self):
-        self._test_context_hook(auth_token_info='data-dict')
 
 
 class TestPolicyDeprecation(tests_base.TestCase):

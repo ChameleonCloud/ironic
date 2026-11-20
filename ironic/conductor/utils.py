@@ -1273,12 +1273,8 @@ def power_on_node_if_needed(task):
             LOG.debug('Waiting for host %(host)s agent to be down',
                       {'host': host_id})
 
-            client = neutron.get_client(context=task.context)
-            try:
-                neutron.wait_for_host_agent(
-                    client, host_id, target_state='down')
-            finally:
-                client.close()
+            neutron.wait_for_host_agent(task.context, host_id,
+                                        target_state='down')
         return previous_power_state
 
 
@@ -2055,30 +2051,6 @@ def exclude_current_conductor(current_conductor, offline_conductors):
                     current_conductor)
 
     return [x for x in offline_conductors if x != current_conductor]
-
-
-def get_token_project_from_request(ctx):
-    """Identifies the request originator project via keystone token details.
-
-    This method evaluates the ``auth_token_info`` field, which is used to
-    pass information returned from keystone as a token's
-    verification. This information is based upon the actual, original
-    requester context provided ``auth_token``.
-
-    When a service, such as Nova proxies a request, the request provided
-    auth token value is intended to be from the original user.
-
-    :returns: The project ID value.
-    """
-
-    try:
-        if ctx.auth_token_info:
-            project = ctx.auth_token_info.get('token', {}).get('project', {})
-            if project:
-                return project.get('id')
-    except AttributeError:
-        LOG.warning('Attempted to identify requester project ID value, '
-                    'however we were unable to do so. Possible older API?')
 
 
 def servicing_error_handler(task, logmsg, errmsg=None, traceback=False,

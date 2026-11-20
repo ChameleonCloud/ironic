@@ -476,13 +476,10 @@ class NeutronInterfaceTestCase(db_base.DbTestCase):
                 context=task.context,
                 reset_mac=True)
 
-    @mock.patch.object(neutron_common, 'get_client', autospec=True)
     @mock.patch.object(neutron_common, 'wait_for_host_agent', autospec=True)
     @mock.patch.object(neutron_common, 'unbind_neutron_port', autospec=True)
     def test_unconfigure_tenant_networks_smartnic(
-            self, mock_unbind_port, wait_agent_mock, client_mock):
-        nclient = mock.MagicMock()
-        client_mock.return_value = nclient
+            self, mock_unbind_port, wait_agent_mock):
         local_link_connection = self.port.local_link_connection
         local_link_connection['hostname'] = 'hostname'
         self.port.local_link_connection = local_link_connection
@@ -494,8 +491,7 @@ class NeutronInterfaceTestCase(db_base.DbTestCase):
                 self.port.internal_info[NetType.TENANT.vif_key],
                 context=task.context,
                 reset_mac=True)
-            wait_agent_mock.assert_called_once_with(nclient, 'hostname')
-            client_mock.return_value.close.assert_called_once()
+            wait_agent_mock.assert_called_once_with(task.context, 'hostname')
 
     @mock.patch.object(neutron_common, 'unbind_neutron_port', autospec=True)
     def test_unconfigure_tenant_networks_portgroup_1(self, mock_unbind_port):

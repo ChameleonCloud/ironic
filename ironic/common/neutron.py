@@ -458,8 +458,8 @@ def add_ports_to_network(task, network_uuid, net_type: NetType,
 
         try:
             if is_smart_nic:
-                wait_for_host_agent(
-                    client, update_port_attrs['binding:host_id'])
+                wait_for_host_agent(task.context,
+                                    update_port_attrs['binding:host_id'])
             port = client.create_port(**port_attrs)
             # record this neutron port for the baremetal port
             record_vif(ironic_port, net_type, port.id)
@@ -576,7 +576,7 @@ def remove_neutron_ports(task, params, net_type: NetType):
                   {'vif_port_id': port['id'], 'node_id': node_uuid})
 
         if is_smartnic_port(port):
-            wait_for_host_agent(client, port['binding:host_id'])
+            wait_for_host_agent(task.context, port['binding:host_id'])
         try:
             client.delete_port(port)
         # NOTE(mgoddard): Ignore if the port was deleted by nova.
@@ -935,7 +935,7 @@ def validate_network(uuid_or_name, net_type=_('network'), context=None):
             _('UUID or name of %s is not set in configuration or '
               'in node driver_info.') % net_type)
 
-    client = get_client(context=context)
+    client = get_client(context=context, auth_from_config=True)
     try:
         network = _get_network_by_uuid_or_name(client, uuid_or_name,
                                                net_type=net_type)
@@ -1199,10 +1199,11 @@ def get_physnets_by_port_uuid(client, port_uuid):
     stop=tenacity.stop_after_attempt(CONF.agent.neutron_agent_max_attempts),
     wait=tenacity.wait_fixed(CONF.agent.neutron_agent_status_retry_interval),
     reraise=True)
-def wait_for_host_agent(client, host_id, target_state='up'):
+def wait_for_host_agent(context, host_id, target_state='up'):
     """Wait for neutron agent to become target state
 
-    :param client: A Neutron client object.
+    :param context: request context
+    :type context: ironic.common.context.RequestContext
     :param host_id: Agent host_id
     :param target_state: up: wait for up status,
         down: wait for down status
@@ -1221,7 +1222,11 @@ def wait_for_host_agent(client, host_id, target_state='up'):
     LOG.debug('Validating host %(host_id)s agent is %(status)s',
               {'host_id': host_id,
                'status': target_state})
-    is_alive = _validate_agent(client, host=host_id)
+    client = get_client(context=context, auth_from_config=True)
+    try:
+        is_alive = _validate_agent(client, host=host_id)
+    finally:
+        client.close()
     LOG.debug('Agent on host %(host_id)s is %(status)s',
               {'host_id': host_id,
                'status': 'up' if is_alive else 'down'})

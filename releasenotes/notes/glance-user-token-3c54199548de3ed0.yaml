@@ -1,0 +1,20 @@
+---
+features:
+  - |
+    Members of a node's lessee project may now validate the node and change
+    its provision state, for example to deploy it. A service such as the
+    Compute service can therefore lease a node to a user's project and
+    deploy it with that user's token. API version 1.116 advertises this.
+upgrade:
+  - |
+    The default ``baremetal:node:validate`` and
+    ``baremetal:node:set_provision_state`` policies now allow members of the
+    node's lessee project, in addition to its admins and managers. This
+    applies to every node with a lessee.
+  - |
+    Ironic no longer checks image visibility or ownership itself. The Image
+    service decides which images a request may use, based on the token of
+    the requesting user that ironic sends. The
+    ``[DEFAULT]allow_image_access_via_auth_token`` and
+    ``[DEFAULT]ignore_project_check_for_admin_tasks`` options have been
+    removed.

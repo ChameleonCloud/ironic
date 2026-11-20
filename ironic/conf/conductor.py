@@ -467,10 +467,10 @@ opts = [
                     'node.instance_info[\'project_id\'] at deployment '
                     'time. Useful for Nova-fronted deployments.')),
                    (lessee_sources.REQUEST, _(  # 'request'
-                    'Populates node.lessee field using metadata '
-                    'from request context. Only useful for direct '
-                    'deployment requests to Ironic; not those proxied '
-                    'via an external service like Nova.')),
+                    'Populates node.lessee field using the project of '
+                    'the requesting user\'s token. For requests relayed '
+                    'by a service such as Nova, this is the user the '
+                    'service acts for.')),
                    (lessee_sources.NONE, _(  # 'none'
                     'Ironic will not populate the node.lessee field.'))
                ],

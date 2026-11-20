@@ -21,25 +21,15 @@ CONF = cfg.CONF
 class RequestContext(context.RequestContext):
     """Extends security contexts from the oslo.context library."""
 
-    # NOTE(TheJulia): This is a flag used by oslo.context which allows us to
-    # pass in a list of keys to preserve when calling from_dict() on the
-    # RequestContext class.
-    FROM_DICT_EXTRA_KEYS = ['auth_token_info']
-
-    def __init__(self, is_public_api=False, auth_token_info=None, **kwargs):
+    def __init__(self, is_public_api=False, **kwargs):
         """Initialize the RequestContext
 
         :param is_public_api: Specifies whether the request should be processed
             without authentication.
-        :param auth_token_info: Parameter to house auth token validation
-            response data such as the user auth token's project id as opposed
-            to the bearer token used. This allows for easy access to attributes
-            for the end user when actions are taken on behalf of a user.
         :param kwargs: additional arguments passed to oslo.context.
         """
         super(RequestContext, self).__init__(**kwargs)
         self.is_public_api = is_public_api
-        self.auth_token_info = auth_token_info
 
     def to_policy_values(self):
         policy_values = super(RequestContext, self).to_policy_values()
@@ -77,24 +67,8 @@ class RequestContext(context.RequestContext):
         :type environ: dict
         """
         is_public_api = environ.get('is_public_api', False)
-        auth_token_info = environ.get('keystone.token_info')
-
-        context = super().from_environ(
-            environ,
-            is_public_api=is_public_api,
-            auth_token_info=auth_token_info,
-            **kwargs
-        )
-        return context
-
-    def to_dict(self):
-        """Return a dictionary of context attributes."""
-        # The parent class in oslo.context provides the core standard
-        # fields, but does not go beyond that. This preserves auth_token_info
-        # for serialization and ultimately things like RPC transport.
-        cdict = super().to_dict()
-        cdict['auth_token_info'] = self.auth_token_info
-        return cdict
+        return super().from_environ(
+            environ, is_public_api=is_public_api, **kwargs)
 
 
 def get_admin_context():

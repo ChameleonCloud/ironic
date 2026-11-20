@@ -870,8 +870,9 @@ This setting is also available in the node ``driver_info`` and
 Mitigating Factors to disk images
 ---------------------------------
 
-In a fully integrated OpenStack context, Ironic requires images to be set to
-"public" in the Image Service.
+In a fully integrated OpenStack context, Ironic accesses images in the Image
+service with the token of the user requesting the deployment, so the Image
+service decides which images that user can deploy.
 
 A direct API user with sufficient elevated access rights *can* submit a URL
 for the baremetal node ``instance_info`` dictionary field with an

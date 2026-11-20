@@ -261,12 +261,10 @@ class TestGlanceImageService(base.TestCase):
                                    'image contains no data',
                                    self.service.download, image_id)
 
-    @mock.patch.object(service_utils, '_GLANCE_SESSION', autospec=True)
     @mock.patch('os.sendfile', autospec=True)
     @mock.patch('os.path.getsize', autospec=True)
     @mock.patch('%s.open' % __name__, new=mock.mock_open(), create=True)
-    def test_download_file_url(self, mock_getsize, mock_sendfile,
-                               mock_serviceutils_glance):
+    def test_download_file_url(self, mock_getsize, mock_sendfile):
         # NOTE: only in v2 API
         class MyGlanceStubClient(stubs.StubGlanceClient):
 
@@ -286,7 +284,6 @@ class TestGlanceImageService(base.TestCase):
 
         stub_service = image_service.GlanceImageService(stub_client,
                                                         context=stub_context)
-        mock_serviceutils_glance.return_value = stub_service
         image_id = uuidutils.generate_uuid()
 
         self.config(allowed_direct_url_schemes=['file'], group='glance')
@@ -346,12 +343,6 @@ class TestGlanceImageService(base.TestCase):
         writer = NullWriter()
         self.assertRaises(exception.ImageNotFound, stub_service.download,
                           image_id, writer)
-
-    def test_member_list(self):
-        image_id = uuidutils.generate_uuid()
-        result = self.service.member_list(image_id)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].member_id, self.client.member_id)
 
 
 @mock.patch('ironic.common.keystone.get_auth', autospec=True,
@@ -1072,82 +1063,3 @@ class TestServiceUtils(base.TestCase):
         self.assertFalse(service_utils.is_glance_image(image_href))
         image_href = None
         self.assertFalse(service_utils.is_glance_image(image_href))
-
-
-class TestIsImageAvailable(base.TestCase):
-
-    def setUp(self):
-        super(TestIsImageAvailable, self).setUp()
-        self.image = mock.Mock()
-        self.context = context.RequestContext()
-        self.context.roles = []
-
-    def test_allow_access_via_auth_token_enabled(self):
-        self.context.auth_token = 'fake-token'
-        self.config(allow_image_access_via_auth_token=True)
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-
-    def test_allow_public_image(self):
-        self.image.visibility = 'public'
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-
-    def test_allow_community_image(self):
-        self.image.visibility = 'community'
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-
-    def test_allow_admin_if_config_enabled(self):
-        self.context.roles = ['admin']
-        self.config(ignore_project_check_for_admin_tasks=True)
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-
-    def test_allow_private_image_owned_by_conductor(self):
-        self.image.visibility = 'private'
-        self.image.owner = service_utils.get_conductor_project_id()
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-
-    @mock.patch.object(service_utils, 'get_image_member_list', autospec=True)
-    def test_allow_shared_image_if_member(self, mock_get_members):
-        self.image.visibility = 'shared'
-        self.image.id = 'shared-image-id'
-        self.image.owner = 'some-other-project'
-
-        self.context.project = 'test-project'
-
-        # Mock the conductor project ID and the shared member list
-        conductor_id = service_utils.get_conductor_project_id()
-        mock_get_members.return_value = [conductor_id]
-
-        self.assertTrue(service_utils.is_image_available(
-            self.context, self.image))
-        mock_get_members.assert_called_once_with('shared-image-id',
-                                                 self.context)
-
-    @mock.patch.object(service_utils, 'get_image_member_list', autospec=True)
-    def test_no_member_list_query_for_non_shared_images(self,
-                                                        mock_get_members):
-        # Glance rejects member listing on non-shared images with a 403,
-        # so ensure we never query members unless visibility is 'shared'.
-        for visibility in ('public', 'community', 'private'):
-            self.image.visibility = visibility
-            self.image.owner = service_utils.get_conductor_project_id()
-            service_utils.is_image_available(self.context, self.image)
-        mock_get_members.assert_not_called()
-
-    def test_deny_private_image_different_owner(self):
-        self.config(ignore_project_check_for_admin_tasks=False)
-
-        self.image.visibility = 'private'
-        self.image.owner = 'other-owner'
-        self.image.id = 'fake-id'
-
-        self.context.project = 'test-project'
-        self.context.roles = []
-        self.context.auth_token = None
-
-        result = service_utils.is_image_available(self.context, self.image)
-        self.assertFalse(result)

@@ -2,6 +2,15 @@
 REST API Version History
 ========================
 
+1.116 (master)
+--------------
+
+Members of a node's lessee project may validate the node and change its
+provision state.
+
+This version advertises the change in default policy; it does not depend on
+the version a request asks for.
+
 1.115 (Hibiscus)
 ----------------
 

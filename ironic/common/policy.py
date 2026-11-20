@@ -108,6 +108,7 @@ PROJECT_OWNER_MEMBER = ('role:member and project_id:%(node.owner)s')
 PROJECT_OWNER_READER = ('role:reader and project_id:%(node.owner)s')
 PROJECT_LESSEE_ADMIN = ('role:admin and project_id:%(node.lessee)s')
 PROJECT_LESSEE_MANAGER = ('role:manager and project_id:%(node.lessee)s')
+PROJECT_LESSEE_MEMBER = ('role:member and project_id:%(node.lessee)s')
 
 # Not used - Members can create/destroy their allocations.
 ALLOCATION_OWNER_ADMIN = ('role:admin and project_id:%(allocation.owner)s')
@@ -138,6 +139,11 @@ RUNBOOK_CREATOR = (
 # Used for general operations like changing provision state.
 SYSTEM_OR_OWNER_MEMBER_AND_LESSEE_ADMIN = (
     '(' + SYSTEM_MEMBER + ') or (' + SYSTEM_SERVICE + ') or (' + PROJECT_OWNER_MEMBER + ') or (' + PROJECT_LESSEE_ADMIN + ') or (' + PROJECT_LESSEE_MANAGER + ') or (' + PROJECT_SERVICE + ')'  # noqa
+)
+
+# Used for deploying a node, including by its lessee.
+SYSTEM_OR_OWNER_OR_LESSEE_MEMBER = (
+    '(' + SYSTEM_OR_OWNER_MEMBER_AND_LESSEE_ADMIN + ') or (' + PROJECT_LESSEE_MEMBER + ')'  # noqa
 )
 
 # Used for creation and deletion of network ports.
@@ -725,7 +731,7 @@ node_policies = [
     ),
     policy.DocumentedRuleDefault(
         name='baremetal:node:validate',
-        check_str=SYSTEM_OR_OWNER_MEMBER_AND_LESSEE_ADMIN,
+        check_str=SYSTEM_OR_OWNER_OR_LESSEE_MEMBER,
         scope_types=['system', 'project'],
         description='Request active validation of Nodes',
         operations=[
@@ -863,7 +869,7 @@ node_policies = [
     ),
     policy.DocumentedRuleDefault(
         name='baremetal:node:set_provision_state',
-        check_str=SYSTEM_OR_OWNER_MEMBER_AND_LESSEE_ADMIN,
+        check_str=SYSTEM_OR_OWNER_OR_LESSEE_MEMBER,
         scope_types=['system', 'project'],
         description='Change Node provision status',
         operations=[

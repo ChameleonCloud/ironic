@@ -224,7 +224,7 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
         self.client_mock = mock.Mock()
         patcher = mock.patch('ironic.common.neutron.get_client',
                              return_value=self.client_mock, autospec=True)
-        patcher.start()
+        self.get_client_mock = patcher.start()
         self.addCleanup(patcher.stop)
 
         port_show_file = os.path.join(
@@ -1207,9 +1207,12 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
     def test_wait_for_host_agent_up_target_state_up(
             self, sleep_mock, validate_agent_mock):
         validate_agent_mock.return_value = True
-        self.assertTrue(neutron.wait_for_host_agent(
-            self.client_mock, 'hostname'))
-        validate_agent_mock.assert_called_once()
+        self.assertTrue(neutron.wait_for_host_agent(self.context, 'hostname'))
+        self.get_client_mock.assert_called_once_with(context=self.context,
+                                                     auth_from_config=True)
+        validate_agent_mock.assert_called_once_with(self.client_mock,
+                                                    host='hostname')
+        self.client_mock.close.assert_called_once_with()
 
     @mock.patch.object(neutron, '_validate_agent', autospec=True)
     @mock.patch.object(time, 'sleep', autospec=True)
@@ -1219,8 +1222,8 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
             tenacity.stop_after_attempt(3))
         validate_agent_mock.return_value = False
         self.assertRaises(exception.NetworkError,
-                          neutron.wait_for_host_agent,
-                          self.client_mock, 'hostname')
+                          neutron.wait_for_host_agent, self.context,
+                          'hostname')
 
     @mock.patch.object(neutron, '_validate_agent', autospec=True)
     @mock.patch.object(time, 'sleep', autospec=True)
@@ -1230,15 +1233,15 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
             tenacity.stop_after_attempt(3))
         validate_agent_mock.return_value = True
         self.assertRaises(exception.NetworkError,
-                          neutron.wait_for_host_agent,
-                          self.client_mock, 'hostname', target_state='down')
+                          neutron.wait_for_host_agent, self.context,
+                          'hostname', target_state='down')
 
     @mock.patch.object(neutron, '_validate_agent', autospec=True)
     def test_wait_for_host_agent_down_target_state_down(
             self, validate_agent_mock):
         validate_agent_mock.return_value = False
         self.assertTrue(
-            neutron.wait_for_host_agent(self.client_mock, 'hostname',
+            neutron.wait_for_host_agent(self.context, 'hostname',
                                         target_state='down'))
         sleep_mock = mock.Mock()
         neutron.wait_for_host_agent.retry.sleep = sleep_mock
@@ -1331,8 +1334,7 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
                 **expected_create_attrs)
             update_mock.assert_called_once_with(
                 self.context, self.neutron_port.id, expected_update_attrs)
-            wait_agent_mock.assert_called_once_with(
-                self.client_mock, 'hostname')
+            wait_agent_mock.assert_called_once_with(task.context, 'hostname')
             wait_port_mock.assert_called_once_with(
                 self.client_mock, self.neutron_port.id, 'ACTIVE',
                 fail_on_binding_failure=True)
@@ -1352,7 +1354,7 @@ class TestNeutronNetworkActions(db_base.DbTestCase):
         self.client_mock.delete_port.assert_called_once_with(
             self.neutron_port)
         is_smartnic_mock.assert_called_once_with(self.neutron_port)
-        wait_agent_mock.assert_called_once_with(self.client_mock, 'hostname')
+        wait_agent_mock.assert_called_once_with(task.context, 'hostname')
 
 
 @mock.patch.object(neutron, 'get_client', autospec=True)
@@ -1370,6 +1372,8 @@ class TestValidateNetwork(base.TestCase):
         self.assertEqual(self.uuid, neutron.validate_network(
             self.uuid, context=self.context))
         net_mock.assert_called_once_with(self.uuid, ignore_missing=False)
+        client_mock.assert_called_once_with(context=self.context,
+                                            auth_from_config=True)
 
     def test_by_name(self, client_mock):
         net_mock = client_mock.return_value.find_network

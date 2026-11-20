@@ -92,7 +92,7 @@ def apply_automatic_lessee(task):
     if CONF.conductor.automatic_lessee:
         project = None
         if CONF.conductor.automatic_lessee_source == lessee_sources.REQUEST:
-            project = utils.get_token_project_from_request(task.context)
+            project = task.context.project_id
             if project is None:
                 LOG.debug('Could not automatically save lessee: No project '
                           'found in request context for node %(uuid)s.',
@@ -111,7 +111,7 @@ def apply_automatic_lessee(task):
 
         # NOTE(JayF): the CONF.conductor.automatic_lessee_source == 'none'
         # falls through since project will never be set.
-        if project:
+        if project and node.lessee != project:
             if node.lessee is None:
                 LOG.debug('Adding lessee %(project)s to node %(uuid)s.',
                           {'project': project,

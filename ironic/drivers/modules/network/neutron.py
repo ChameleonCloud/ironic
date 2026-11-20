@@ -214,12 +214,9 @@ class NeutronNetwork(common.NeutronVIFPortIDMixin,
 
             is_smart_nic = neutron.is_smartnic_port(port_like_obj)
             if is_smart_nic:
-                client = neutron.get_client(context=task.context)
-                try:
-                    link_info = port_like_obj.local_link_connection
-                    neutron.wait_for_host_agent(client, link_info['hostname'])
-                finally:
-                    client.close()
+                neutron.wait_for_host_agent(
+                    task.context,
+                    port_like_obj.local_link_connection['hostname'])
 
             # NOTE(kaifeng) address is optional for port group, avoid to
             # regenerate mac when the address is absent.

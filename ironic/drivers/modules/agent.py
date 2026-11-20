@@ -876,14 +876,8 @@ class AgentDeploy(CustomAgentDeploy):
             if not root_uuid:
                 image_source = node.instance_info.get('image_source')
                 try:
-                    context = task.context
-                    # TODO(TheJulia): Uhh, is_admin likely needs to be
-                    # addressed in Xena as undesirable behavior may
-                    # result, or just outright break in an entirely
-                    # system scoped configuration.
-                    context.is_admin = True
                     glance = image_service.GlanceImageService(
-                        context=context)
+                        context=task.context)
                     image_info = glance.show(image_source)
                     image_properties = image_info.get('properties')
                     root_uuid = image_properties['rootfs_uuid']

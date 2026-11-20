@@ -37,9 +37,6 @@ class RequestContextTestCase(tests_base.TestCase):
             "roles": None,
             "overwrite": True
         }
-        self.environ = {
-            'keystone.token_info': {'key': 'value'},
-        }
 
     @mock.patch.object(oslo_context.RequestContext, "__init__", autospec=True)
     def test_create_context(self, context_mock):
@@ -52,6 +49,24 @@ class RequestContextTestCase(tests_base.TestCase):
         ctx_dict = ctx.to_policy_values()
         self.assertEqual('somename', ctx_dict['project_name'])
         self.assertTrue(ctx_dict['is_public_api'])
+
+    def test_service_token_does_not_change_identity(self):
+        environ = {
+            'HTTP_X_AUTH_TOKEN': 'user-token',
+            'HTTP_X_USER_ID': 'user',
+            'HTTP_X_PROJECT_ID': 'user-project',
+            'HTTP_X_ROLES': 'member',
+            'HTTP_X_SERVICE_TOKEN': 'service-token',
+            'HTTP_X_SERVICE_USER_ID': 'service-user',
+            'HTTP_X_SERVICE_PROJECT_ID': 'service-project',
+            'HTTP_X_SERVICE_ROLES': 'service',
+        }
+        ctx = context.RequestContext.from_environ(environ)
+        policy_values = ctx.to_policy_values()
+        self.assertEqual('user-token', ctx.auth_token)
+        self.assertEqual('user', policy_values['user_id'])
+        self.assertEqual('user-project', policy_values['project_id'])
+        self.assertEqual(['member'], policy_values['roles'])
 
     @mock.patch.object(oslo_context, 'get_current', autospec=True)
     def test_thread_without_context(self, context_get_mock):
@@ -66,26 +81,3 @@ class RequestContextTestCase(tests_base.TestCase):
         context_get_mock.return_value = self.context
         self.context.ensure_thread_contain_context()
         self.assertFalse(self.context.update_store.called)
-
-    def test_create_context_with_environ(self):
-        test_context = context.RequestContext().from_environ(self.environ)
-        self.assertEqual({'key': 'value'}, test_context.auth_token_info)
-
-    def test_to_dict_get_auth_token_info(self):
-        test_context = context.RequestContext().from_environ(self.environ)
-        self.assertEqual({'key': 'value'}, test_context.auth_token_info)
-        result = test_context.to_dict()
-        self.assertIn('auth_token_info', result)
-        expected = {'key': 'value'}
-        self.assertDictEqual(expected, result['auth_token_info'])
-
-    def test_from_dict(self):
-        cdict = {'auth_token_info': 'magicdict'}
-        ctxt = context.RequestContext().from_dict(cdict)
-        self.assertEqual('magicdict', ctxt.auth_token_info)
-
-    def test_from_dict_older_api_server(self):
-        # Validates auth_token_info is None if not included.
-        cdict = {}
-        ctxt = context.RequestContext().from_dict(cdict)
-        self.assertIsNone(ctxt.auth_token_info)

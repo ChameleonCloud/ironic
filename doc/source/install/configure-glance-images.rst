@@ -30,15 +30,14 @@ Load all the created images into the Image service, and note the image UUIDs in
 the Image service for each one as it is generated.
 
 .. note::
-   Images from Glance used by Ironic must be flagged as ``public``, which
-   requires administrative privileges with the Glance image service to set.
+   Ironic accesses Glance with the token of the user who requested the
+   deployment, so that user can deploy any image Glance allows them to use,
+   including private and shared images. Without a user token, for example
+   when ironic is not using keystone authentication, ironic uses the
+   credentials in the ``[glance]`` section.
 
-.. note::
-   Starting with the 2025.2 release, the Ironic conductor can access images that
-   are shared with its project, in addition to those it owns.
-
-   To use this feature, ensure the required images are shared with the project
-   associated with the conductor's credentials.
+   For deployments through the Compute service, this requires a Compute
+   service that sends the user's token to ironic.
 
 - For *whole disk images* just upload the image:
 

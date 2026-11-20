@@ -2533,7 +2533,6 @@ class MiscTestCase(db_base.DbTestCase):
             self.assertEqual(0, boot_device_mock.call_count)
             self.assertEqual(0, power_action_mock.call_count)
 
-    @mock.patch.object(neutron, 'get_client', autospec=True)
     @mock.patch.object(neutron, 'wait_for_host_agent', autospec=True)
     @mock.patch.object(time, 'sleep', autospec=True)
     @mock.patch.object(fake.FakePower, 'get_power_state', autospec=True)
@@ -2546,7 +2545,7 @@ class MiscTestCase(db_base.DbTestCase):
     def test_power_on_node_if_needed_with_smart_nic_port(
             self, power_action_mock, boot_device_mock,
             need_power_on_mock, get_power_state_mock, time_mock,
-            wait_agent_mock, get_client_mock):
+            wait_agent_mock):
         llc = {'port_id': 'rep0-0', 'hostname': 'host1'}
         port = obj_utils.get_test_port(self.context, node_id=self.node.id,
                                        is_smartnic=True,
@@ -2561,8 +2560,7 @@ class MiscTestCase(db_base.DbTestCase):
             boot_device_mock.assert_called_once_with(
                 task, boot_devices.BIOS, persistent=False)
             power_action_mock.assert_called_once_with(task, states.POWER_ON)
-            get_client_mock.assert_called_once_with(context=self.context)
-            wait_agent_mock.assert_called_once_with(mock.ANY, 'host1',
+            wait_agent_mock.assert_called_once_with(task.context, 'host1',
                                                     target_state='down')
 
     @mock.patch.object(time, 'sleep', autospec=True)
@@ -3454,23 +3452,6 @@ class NodeHistoryRecordTestCase(db_base.DbTestCase):
         entry = entries[0]
 
         self.assertEqual('context-user-alpha', entry['user'])
-
-
-class GetTokenProjectFromRequestTestCase(db_base.DbTestCase):
-
-    def setUp(self):
-        super(GetTokenProjectFromRequestTestCase, self).setUp()
-        self.auth_token_info = {'token': {'project': {'id': 'user-project'}}}
-
-    def test_no_token_info(self):
-        self.assertIsNone(self.context.auth_token_info)
-        res = conductor_utils.get_token_project_from_request(self.context)
-        self.assertIsNone(res)
-
-    def test_returns_project_id_if_present(self):
-        self.context.auth_token_info = self.auth_token_info
-        res = conductor_utils.get_token_project_from_request(self.context)
-        self.assertEqual('user-project', res)
 
 
 class ServiceUtilsTestCase(db_base.DbTestCase):

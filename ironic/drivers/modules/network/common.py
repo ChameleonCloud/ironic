@@ -300,7 +300,8 @@ def plug_port_to_tenant_network(task, port_like_obj, client=None):
         client = client_to_close = neutron.get_client(context=task.context)
 
     if is_smart_nic:
-        neutron.wait_for_host_agent(client, port_attrs['binding:host_id'])
+        neutron.wait_for_host_agent(task.context,
+                                    port_attrs['binding:host_id'])
 
     try:
         neutron.update_neutron_port(task.context, vif_id, port_attrs)

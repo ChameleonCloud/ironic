@@ -819,10 +819,16 @@ owner_member_can_validate_node:
   headers: *owner_member_headers
   assert_status: 503
 
-lessee_member_cannot_validate_node:
+lessee_member_can_validate_node:
   path: '/v1/nodes/{lessee_node_ident}/validate'
   method: get
   headers: *lessee_member_headers
+  assert_status: 503
+
+lessee_reader_cannot_validate_node:
+  path: '/v1/nodes/{lessee_node_ident}/validate'
+  method: get
+  headers: *lessee_reader_headers
   assert_status: 403
 
 third_party_admin_cannot_validate_node:
@@ -1398,12 +1404,26 @@ lessee_manager_can_change_provision_state:
   body: *provision_body
   assert_status: 503
 
-lessee_member_cannot_change_provision_state:
+lessee_member_can_change_provision_state:
   path: '/v1/nodes/{lessee_node_ident}/states/provision'
   method: put
   headers: *lessee_member_headers
   body: *provision_body
+  assert_status: 503
+
+lessee_reader_cannot_change_provision_state:
+  path: '/v1/nodes/{lessee_node_ident}/states/provision'
+  method: put
+  headers: *lessee_reader_headers
+  body: *provision_body
   assert_status: 403
+
+lessee_member_cannot_change_provision_state_of_other_node:
+  path: '/v1/nodes/{owner_node_ident}/states/provision'
+  method: put
+  headers: *lessee_member_headers
+  body: *provision_body
+  assert_status: 404
 
 third_party_admin_cannot_change_provision_state:
   path: '/v1/nodes/{owner_node_ident}/states/provision'
